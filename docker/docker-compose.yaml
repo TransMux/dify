@@ -412,6 +412,7 @@ services:
     networks:
       - ssrf_proxy_network
       - default
+      - tailscale-nginx
 
   # worker service
   # The Celery worker for processing the queue.
@@ -435,7 +436,7 @@ services:
     networks:
       - ssrf_proxy_network
       - default
-
+      - tailscale-nginx
   # Frontend web application.
   web:
     image: langgenius/dify-web:0.15.2
@@ -508,6 +509,7 @@ services:
       test: [ 'CMD', 'curl', '-f', 'http://localhost:8194/health' ]
     networks:
       - ssrf_proxy_network
+      - tailscale-nginx
 
   # ssrf_proxy server
   # for more information, please refer to
@@ -529,6 +531,7 @@ services:
     networks:
       - ssrf_proxy_network
       - default
+      - tailscale-nginx
 
   # Certbot service
   # use `docker-compose --profile certbot up` to start the certbot service.
@@ -549,6 +552,19 @@ services:
       - CERTBOT_OPTIONS=${CERTBOT_OPTIONS:-}
     entrypoint: [ '/docker-entrypoint.sh' ]
     command: [ 'tail', '-f', '/dev/null' ]
+
+  tailscale-nginx:
+    image: tailscale/tailscale:latest  # 使用官方的 Tailscale 镜像
+    hostname: dify  # 容器的主机名
+    environment:
+      - TS_AUTHKEY=tskey-auth-khvhmY78we11CNTRL-kUdFiNeCFqhPqfH3HAXSphm7YEVKZzg7V  # 认证密钥
+      - TS_STATE_DIR=/var/lib/tailscale  # 指定 Tailscale 状态目录
+      - TS_USERSPACE=true  # 使用内核模式而非用户空间模式
+    volumes:
+      - ${PWD}/tailscale-nginx/state:/var/lib/tailscale  # 映射 Tailscale 状态目录
+    cap_add:
+      - net_admin  # 容器需要管理员权限来配置网络
+    restart: unless-stopped  # 设定容器的重启策略
 
   # The nginx reverse proxy.
   # used for reverse proxying the API service and Web service.
@@ -586,6 +602,7 @@ services:
     depends_on:
       - api
       - web
+      - tailscale-nginx
     ports:
       - '${EXPOSE_NGINX_PORT:-80}:${NGINX_PORT:-80}'
       - '${EXPOSE_NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}'
@@ -959,6 +976,9 @@ networks:
   milvus:
     driver: bridge
   opensearch-net:
+    driver: bridge
+    internal: true
+  tailscale-nginx:
     driver: bridge
     internal: true
 
